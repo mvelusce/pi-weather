@@ -60,8 +60,8 @@ def process_line(line):
 
 def main():
     # Start Prometheus HTTP server
-    start_http_server(8000)
-    print("Prometheus metrics available on port 8000")
+    start_http_server(9550)
+    print("Prometheus metrics available on port 9550")
     
     proc = run_rtl433()
     
