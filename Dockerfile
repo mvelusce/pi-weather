@@ -14,4 +14,4 @@ RUN pip install prometheus-client
 # Copy application code
 COPY exporter.py .
 
-CMD ["python", "exporter.py"]
+CMD ["python", "-u", "exporter.py"]
