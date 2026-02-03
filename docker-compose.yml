@@ -1,0 +1,13 @@
+version: '3.8'
+
+services:
+  weather-exporter:
+    build: .
+    image: weather-exporter:latest
+    container_name: weather-exporter
+    devices:
+      - /dev/bus/usb:/dev/bus/usb
+    ports:
+      - "8000:8000"
+    restart: unless-stopped
+    privileged: true
