@@ -11,9 +11,9 @@ sudo rtl_433 -f 433.92M -R 214 -F json
  """
 
 # Prometheus Metrics
-TEMPERATURE = Gauge('weather_temperature_celsius', 'Temperature in Celsius', ['model', 'id', 'channel'])
-HUMIDITY = Gauge('weather_humidity_percent', 'Humidity percentage', ['model', 'id', 'channel'])
-BATTERY = Gauge('weather_battery_ok', 'Battery status (1=OK, 0=Low)', ['model', 'id', 'channel'])
+TEMPERATURE = Gauge('weather_temperature_celsius', 'Temperature in Celsius', ['model', 'id', 'channel', 'location'])
+HUMIDITY = Gauge('weather_humidity_percent', 'Humidity percentage', ['model', 'id', 'channel', 'location'])
+BATTERY = Gauge('weather_battery_ok', 'Battery status (1=OK, 0=Low)', ['model', 'id', 'channel', 'location'])
 
 # Configuration
 MODEL = "EMOS-E6016"
@@ -51,13 +51,13 @@ def main():
             print(f"[{datetime.now().strftime('%H:%M:%S')}] {location} (Ch {chan}): {temp}°C, {hum}%")
             
             if temp is not None:
-                TEMPERATURE.labels(model=model, id=s_id, channel=chan).set(temp)
+                TEMPERATURE.labels(model=model, id=s_id, channel=chan, location=location).set(temp)
             
             if hum is not None:
-                HUMIDITY.labels(model=model, id=s_id, channel=chan).set(hum)
+                HUMIDITY.labels(model=model, id=s_id, channel=chan, location=location).set(hum)
                 
             if battery is not None:
-                BATTERY.labels(model=model, id=s_id, channel=chan).set(battery)
+                BATTERY.labels(model=model, id=s_id, channel=chan, location=location).set(battery)
             
         except Exception:
             continue
