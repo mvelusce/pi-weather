@@ -7,9 +7,5 @@ services:
       - /dev/bus/usb:/dev/bus/usb
     ports:
       - "9550:9550"
-    environment:
-      - DEBUG=false
-      - SENSOR_IDS=201
-      - PYTHONUNBUFFERED=1
     restart: unless-stopped
     privileged: true

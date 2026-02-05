@@ -1,4 +1,4 @@
-FROM python:3.9-slim-bullseye
+FROM python:3.11-slim-bookworm
 
 # Install rtl_433 and dependencies
 RUN apt-get update && \
