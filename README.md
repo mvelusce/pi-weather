@@ -36,11 +36,32 @@ journalctl -u weather-exporter -f
 ```
 
 ### Access Metrics
-The exporter runs on port **9550** by default.
+The exporter runs on port **9550** by default (configurable in `config.yaml`).
 ```bash
 curl http://localhost:9550/metrics
 ```
 
 ## Configuration
-- Modify `exporter.py` to update the `SENSOR_MAP` with your specific sensor IDs and names.
-- The service monitors 433.92MHz by default.
+
+All settings are stored in `config.yaml`. After installation, the config file is located at `/opt/weather-exporter/config.yaml`.
+
+```yaml
+exporter:
+  port: 9550
+
+rtl433:
+  frequency: "433.92M"
+  protocol: 214
+
+sensor:
+  model: "EMOS-E6016"
+  locations:
+    104: "Living Room"
+    124: "Window"
+```
+
+To add or update sensors, edit the `locations` map with your sensor IDs and names. After making changes, restart the service:
+
+```bash
+sudo systemctl restart weather-exporter
+```
