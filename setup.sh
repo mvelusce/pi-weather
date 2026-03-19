@@ -19,7 +19,7 @@ apt-get install -y rtl-433 python3-venv python3-pip
 
 echo "Setting up installation directory at $INSTALL_DIR..."
 mkdir -p "$INSTALL_DIR"
-cp exporter.py requirements.txt "$INSTALL_DIR/"
+cp exporter.py requirements.txt config.yaml "$INSTALL_DIR/"
 
 # Create virtual environment
 if [ ! -d "$VENV_DIR" ]; then
