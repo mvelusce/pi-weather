@@ -1,0 +1,18 @@
+# Weather Station Exporter Configuration
+
+# Prometheus exporter settings
+exporter:
+  port: 9550
+
+# RTL-433 radio settings
+rtl433:
+  frequency: "433.92M"
+  protocol: 214
+
+# Sensor configuration
+sensor:
+  model: "EMOS-E6016"
+  # Map sensor IDs to location names
+  locations:
+    104: "Living Room"
+    124: "Window"
