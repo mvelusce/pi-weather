@@ -1,9 +1,12 @@
 import subprocess
 import json
+import time
+import threading
 from datetime import datetime
 from pathlib import Path
 import yaml
-from prometheus_client import start_http_server, Gauge
+from flask import Flask, jsonify, Response
+from prometheus_client import Gauge, generate_latest, CONTENT_TYPE_LATEST
 
 """
 sudo rtl_433 -f 433.92M -R 214 -F json
@@ -21,15 +24,67 @@ with open(CONFIG_PATH) as f:
 TEMPERATURE = Gauge('weather_temperature_celsius', 'Temperature in Celsius', ['model', 'id', 'channel', 'location'])
 HUMIDITY = Gauge('weather_humidity_percent', 'Humidity percentage', ['model', 'id', 'channel', 'location'])
 BATTERY = Gauge('weather_battery_ok', 'Battery status (1=OK, 0=Low)', ['model', 'id', 'channel', 'location'])
+LAST_UPDATE = Gauge('weather_last_update_timestamp', 'Unix timestamp of last sensor reading', ['model', 'id', 'channel', 'location'])
+
+# In-memory state for health endpoint
+sensor_states = {}
 
 # Configuration from file
 MODEL = config['sensor']['model']
 SENSOR_MAP = config['sensor']['locations']
+STALE_THRESHOLD_SECONDS = 300  # 5 minutes
+
+# Flask app for health endpoint
+app = Flask(__name__)
+
+@app.route('/metrics')
+def metrics():
+    return Response(generate_latest(), mimetype=CONTENT_TYPE_LATEST)
+
+@app.route('/health')
+def health():
+    now = time.time()
+    sensors = []
+    all_healthy = True
+
+    for sensor_id, state in sensor_states.items():
+        age_seconds = now - state['last_update']
+        is_stale = age_seconds > STALE_THRESHOLD_SECONDS
+        if is_stale:
+            all_healthy = False
+
+        sensors.append({
+            'id': sensor_id,
+            'location': state['location'],
+            'temperature_c': state['temperature'],
+            'humidity_percent': state['humidity'],
+            'battery_ok': state['battery'],
+            'last_update': datetime.fromtimestamp(state['last_update']).isoformat(),
+            'age_seconds': round(age_seconds, 1),
+            'stale': is_stale
+        })
+
+    status = 'healthy' if all_healthy and sensors else 'degraded' if sensors else 'no_data'
+
+    return jsonify({
+        'status': status,
+        'sensor_count': len(sensors),
+        'stale_threshold_seconds': STALE_THRESHOLD_SECONDS,
+        'sensors': sensors
+    })
+
+def run_flask(port):
+    import logging
+    log = logging.getLogger('werkzeug')
+    log.setLevel(logging.ERROR)
+    app.run(host='0.0.0.0', port=port, threaded=True)
 
 def main():
     port = config['exporter']['port']
-    start_http_server(port)
-    print(f"Prometheus exporter started on port {port}")
+
+    flask_thread = threading.Thread(target=run_flask, args=(port,), daemon=True)
+    flask_thread.start()
+    print(f"Exporter started on port {port} (endpoints: /metrics, /health)")
 
     rtl_config = config['rtl433']
     cmd = ['rtl_433', '-f', rtl_config['frequency'], '-R', str(rtl_config['protocol']), '-F', 'json']
@@ -55,15 +110,28 @@ def main():
             battery = packet.get('battery_ok')
 
             print(f"[{datetime.now().strftime('%H:%M:%S')}] {location} (Ch {chan}): {temp}°C, {hum}%")
-            
+
+            now = time.time()
+            labels = dict(model=model, id=s_id, channel=chan, location=location)
+
             if temp is not None:
-                TEMPERATURE.labels(model=model, id=s_id, channel=chan, location=location).set(temp)
-            
+                TEMPERATURE.labels(**labels).set(temp)
+
             if hum is not None:
-                HUMIDITY.labels(model=model, id=s_id, channel=chan, location=location).set(hum)
-                
+                HUMIDITY.labels(**labels).set(hum)
+
             if battery is not None:
-                BATTERY.labels(model=model, id=s_id, channel=chan, location=location).set(battery)
+                BATTERY.labels(**labels).set(battery)
+
+            LAST_UPDATE.labels(**labels).set(now)
+
+            sensor_states[s_id] = {
+                'location': location,
+                'temperature': temp,
+                'humidity': hum,
+                'battery': battery,
+                'last_update': now
+            }
             
         except Exception:
             continue
