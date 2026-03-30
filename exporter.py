@@ -31,7 +31,7 @@ sensor_states = {}
 
 # Configuration from file
 MODEL = config['sensor']['model']
-SENSOR_MAP = config['sensor']['locations']
+SENSOR_MAP = config['sensor']['sensors']
 STALE_THRESHOLD_SECONDS = 300  # 5 minutes
 
 # Flask app for health endpoint
@@ -56,6 +56,7 @@ def health():
         sensors.append({
             'id': sensor_id,
             'location': state['location'],
+            'channel': state['channel'],
             'temperature_c': state['temperature'],
             'humidity_percent': state['humidity'],
             'battery_ok': state['battery'],
@@ -101,12 +102,21 @@ def main():
             if model != MODEL:
                 continue
 
-            # This will log ANY sensor found, even if not in our SENSOR_MAP yet
-            location = SENSOR_MAP.get(s_id, f"Unknown_Sensor_{s_id}")
-            
+            sensor_config = SENSOR_MAP.get(s_id)
+            chan = packet.get('channel')
+
+            if not sensor_config:
+                print(f"[{datetime.now().strftime('%H:%M:%S')}] Unknown sensor {s_id} (Ch {chan}), skipping")
+                continue
+
+            expected_channel = sensor_config.get('channel')
+            if expected_channel is not None and chan != expected_channel:
+                print(f"[{datetime.now().strftime('%H:%M:%S')}] Sensor {s_id} on unexpected channel {chan} (expected {expected_channel}), skipping")
+                continue
+
+            location = sensor_config['location']
             temp = packet.get('temperature_C')
             hum = packet.get('humidity')
-            chan = packet.get('channel')
             battery = packet.get('battery_ok')
 
             print(f"[{datetime.now().strftime('%H:%M:%S')}] {location} (Ch {chan}): {temp}°C, {hum}%")
@@ -127,6 +137,7 @@ def main():
 
             sensor_states[s_id] = {
                 'location': location,
+                'channel': chan,
                 'temperature': temp,
                 'humidity': hum,
                 'battery': battery,

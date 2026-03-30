@@ -12,7 +12,11 @@ rtl433:
 # Sensor configuration
 sensor:
   model: "EMOS-E6016"
-  # Map sensor IDs to location names
-  locations:
-    104: "Living Room"
-    124: "Window"
+  # Map sensor IDs to location and expected channel
+  sensors:
+    104:
+      location: "Living Room"
+      channel: 1
+    124:
+      location: "Window"
+      channel: 3
