@@ -57,6 +57,7 @@ Example response:
     {
       "id": 104,
       "location": "Living Room",
+      "channel": 1,
       "temperature_c": 21.3,
       "humidity_percent": 45,
       "battery_ok": 1,
@@ -87,12 +88,16 @@ rtl433:
 
 sensor:
   model: "EMOS-E6016"
-  locations:
-    104: "Living Room"
-    124: "Window"
+  sensors:
+    104:
+      location: "Living Room"
+      channel: 1
+    124:
+      location: "Window"
+      channel: 3
 ```
 
-To add or update sensors, edit the `locations` map with your sensor IDs and names. After making changes, restart the service:
+Each sensor entry maps an ID to its location and expected channel. Readings from unexpected channels are ignored to prevent duplicate time series. To add or update sensors, edit the `sensors` map. After making changes, restart the service:
 
 ```bash
 sudo systemctl restart weather-exporter
