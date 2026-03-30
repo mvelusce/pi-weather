@@ -47,7 +47,7 @@ def health():
     sensors = []
     all_healthy = True
 
-    for sensor_id, state in sensor_states.items():
+    for (sensor_id, channel), state in sensor_states.items():
         age_seconds = now - state['last_update']
         is_stale = age_seconds > STALE_THRESHOLD_SECONDS
         if is_stale:
@@ -56,7 +56,7 @@ def health():
         sensors.append({
             'id': sensor_id,
             'location': state['location'],
-            'channel': state['channel'],
+            'channel': channel,
             'temperature_c': state['temperature'],
             'humidity_percent': state['humidity'],
             'battery_ok': state['battery'],
@@ -104,24 +104,34 @@ def main():
 
             sensor_config = SENSOR_MAP.get(s_id)
             chan = packet.get('channel')
+            temp = packet.get('temperature_C')
+            hum = packet.get('humidity')
+            battery = packet.get('battery_ok')
+            now = time.time()
+
+            location = sensor_config['location'] if sensor_config else f"Unknown_Sensor_{s_id}"
+
+            # Always update health state for all sensors
+            sensor_states[(s_id, chan)] = {
+                'location': location,
+                'channel': chan,
+                'temperature': temp,
+                'humidity': hum,
+                'battery': battery,
+                'last_update': now
+            }
 
             if not sensor_config:
-                print(f"[{datetime.now().strftime('%H:%M:%S')}] Unknown sensor {s_id} (Ch {chan}), skipping")
+                print(f"[{datetime.now().strftime('%H:%M:%S')}] Unknown sensor {s_id} (Ch {chan}), skipping metrics")
                 continue
 
             expected_channel = sensor_config.get('channel')
             if expected_channel is not None and chan != expected_channel:
-                print(f"[{datetime.now().strftime('%H:%M:%S')}] Sensor {s_id} on unexpected channel {chan} (expected {expected_channel}), skipping")
+                print(f"[{datetime.now().strftime('%H:%M:%S')}] Sensor {s_id} on unexpected channel {chan} (expected {expected_channel}), skipping metrics")
                 continue
-
-            location = sensor_config['location']
-            temp = packet.get('temperature_C')
-            hum = packet.get('humidity')
-            battery = packet.get('battery_ok')
 
             print(f"[{datetime.now().strftime('%H:%M:%S')}] {location} (Ch {chan}): {temp}°C, {hum}%")
 
-            now = time.time()
             labels = dict(model=model, id=s_id, channel=chan, location=location)
 
             if temp is not None:
@@ -134,15 +144,6 @@ def main():
                 BATTERY.labels(**labels).set(battery)
 
             LAST_UPDATE.labels(**labels).set(now)
-
-            sensor_states[s_id] = {
-                'location': location,
-                'channel': chan,
-                'temperature': temp,
-                'humidity': hum,
-                'battery': battery,
-                'last_update': now
-            }
             
         except Exception:
             continue
