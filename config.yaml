@@ -7,16 +7,25 @@ exporter:
 # RTL-433 radio settings
 rtl433:
   frequency: "433.92M"
+  # 1024k listens on 433.41-434.43 MHz. The default 250k (433.80-434.05 MHz)
+  # misses sensors that transmit off-centre or drift when hot.
+  sample_rate: "1024k"
   protocol: 214
 
 # Sensor configuration
 sensor:
   model: "EMOS-E6016"
-  # Map sensor IDs to location and expected channel
-  sensors:
-    104:
-      location: "Living Room"
-      channel: 1
-    124:
-      location: "Window"
-      channel: 3
+  # Sensors are identified by the channel switch on the sensor, not by ID:
+  # the ID changes on every battery swap. Each channel locks to the ID it
+  # hears; a new ID takes over only after the locked one has been silent for
+  # id_switch_after_seconds and the new one has sent id_switch_min_readings.
+  # Locked IDs are kept in state.json next to exporter.py.
+  id_switch_after_seconds: 900
+  id_switch_min_readings: 2
+  channels:
+    1:
+      location: "Indoor Ch1"
+    2:
+      location: "Outdoor Ch2"
+    3:
+      location: "Outdoor Ch3"

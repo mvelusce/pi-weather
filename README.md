@@ -51,21 +51,21 @@ Example response:
 ```json
 {
   "status": "healthy",
-  "sensor_count": 2,
   "stale_threshold_seconds": 300,
   "sensors": [
     {
-      "id": 104,
-      "location": "Living Room",
       "channel": 1,
+      "id": 104,
+      "location": "Indoor Ch1",
       "temperature_c": 21.3,
       "humidity_percent": 45,
       "battery_ok": 1,
-      "last_update": "2026-03-27T14:30:00",
+      "last_update": "2026-11-03T14:30:00",
       "age_seconds": 42.5,
       "stale": false
     }
-  ]
+  ],
+  "ignored": []
 }
 ```
 
@@ -84,21 +84,46 @@ exporter:
 
 rtl433:
   frequency: "433.92M"
+  sample_rate: "1024k"
   protocol: 214
 
 sensor:
   model: "EMOS-E6016"
-  sensors:
-    104:
-      location: "Living Room"
-      channel: 1
-    124:
-      location: "Window"
-      channel: 3
+  id_switch_after_seconds: 900
+  id_switch_min_readings: 2
+  channels:
+    1:
+      location: "Indoor Ch1"
+    2:
+      location: "Outdoor Ch2"
+    3:
+      location: "Outdoor Ch3"
 ```
 
-Each sensor entry maps an ID to its location and expected channel. Readings from unexpected channels are ignored to prevent duplicate time series. To add or update sensors, edit the `sensors` map. After making changes, restart the service:
+`sample_rate` sets how wide a band rtl_433 listens to. EMOS sensors can transmit up to ~200 kHz away from 433.92 MHz and drift further when hot, so the rtl_433 default (250k, ±125 kHz) misses some sensors entirely and loses others on hot days. 1024k (±512 kHz) covers them.
+
+### Sensors are identified by channel
+
+Each sensor is configured by its channel switch, not its ID, because EMOS sensors pick a new random ID on every battery swap. Metrics are labelled `model`, `channel` and `location` only, so a battery swap doesn't create a new time series. Query by `channel` in Grafana (e.g. `max by(channel) (weather_temperature_celsius{channel="3"})`) and `location` can be renamed freely.
+
+Each channel locks to the ID it hears. Readings from a different ID on the same channel (e.g. a neighbour's sensor) are ignored, unless the locked ID has been silent for `id_switch_after_seconds` and the new ID has sent at least `id_switch_min_readings` readings: then the new ID takes over (battery swap). Locked IDs are saved in `state.json` next to `exporter.py`, so restarts keep them. `weather_sensor_info{channel, id}` shows the current ID per channel, `weather_ignored_readings` counts ignored readings, and `/health` lists them under `ignored`.
+
+To force a new ID right away (e.g. after moving a sensor to another channel), stop the service, edit or delete `state.json`, and start it again.
+
+After changing the config, restart the service:
 
 ```bash
 sudo systemctl restart weather-exporter
 ```
+
+### Finding sensors
+
+To find sensors that aren't being received, stop the service and scan all decoders on a wide band:
+
+```bash
+sudo systemctl stop weather-exporter
+sudo rtl_433 -f 433.92M -s 1024k -F json -M level
+sudo systemctl start weather-exporter
+```
+
+The exporter also exports `weather_signal_rssi_db`, `weather_signal_snr_db` and `weather_signal_frequency_mhz` per sensor.
